@@ -1,0 +1,164 @@
+module Int64 exposing (Int64(..), add, and, complement, decode, or, rotateRightBy, shiftLeftBy, shiftRightZfBy, toByteValues, toEncoder, toHex, toUnsigned, xor)
+
+import Bitwise
+import Bytes exposing (Endianness(..))
+import Bytes.Decode as Decode exposing (Decoder)
+import Bytes.Encode as Encode exposing (Encoder)
+import Hex
+
+
+type Int64
+    = Int64 Int Int
+
+
+and : Int64 -> Int64 -> Int64
+and (Int64 a b) (Int64 p q) =
+    Int64 (Bitwise.and a p) (Bitwise.and b q)
+
+
+complement : Int64 -> Int64
+complement (Int64 a b) =
+    Int64 (Bitwise.complement a) (Bitwise.complement b)
+
+
+or : Int64 -> Int64 -> Int64
+or (Int64 a b) (Int64 p q) =
+    Int64 (Bitwise.or a p) (Bitwise.or b q)
+
+
+xor : Int64 -> Int64 -> Int64
+xor (Int64 a b) (Int64 p q) =
+    Int64 (Bitwise.xor a p) (Bitwise.xor b q)
+
+
+add : Int64 -> Int64 -> Int64
+add (Int64 p1 p2) (Int64 p3 p4) =
+    let
+        a =
+            Bitwise.shiftRightZfBy 0 p1
+
+        b =
+            Bitwise.shiftRightZfBy 0 p2
+
+        p =
+            Bitwise.shiftRightZfBy 0 p3
+
+        q =
+            Bitwise.shiftRightZfBy 0 p4
+
+        lower =
+            b + q
+
+        carry1 =
+            if lower > 0xFFFFFFFF then
+                (lower - Bitwise.shiftRightZfBy 0 lower) - 0xFFFFFFFF
+
+            else
+                0
+
+        higher =
+            carry1 + a + p
+    in
+    Int64 (Bitwise.shiftRightBy 0 higher) (Bitwise.shiftRightBy 0 lower)
+
+
+shiftLeftBy : Int -> Int64 -> Int64
+shiftLeftBy n (Int64 higher lower) =
+    if n > 32 then
+        let
+            carry =
+                Bitwise.shiftLeftBy n lower
+        in
+        Int64 carry 0
+
+    else
+        let
+            carry =
+                Bitwise.shiftRightZfBy (32 - n) lower
+
+            newHigher =
+                higher
+                    |> Bitwise.shiftLeftBy n
+                    |> Bitwise.or carry
+        in
+        Int64 newHigher (Bitwise.shiftLeftBy n lower)
+
+
+shiftRightZfBy : Int -> Int64 -> Int64
+shiftRightZfBy n (Int64 higher lower) =
+    if n > 32 then
+        Int64 0 (Bitwise.shiftRightZfBy n higher)
+
+    else
+        let
+            carry =
+                Bitwise.shiftLeftBy (32 - n) higher
+
+            newLower =
+                lower
+                    |> Bitwise.shiftRightZfBy n
+                    |> Bitwise.or carry
+                    |> Bitwise.shiftRightZfBy 0
+        in
+        Int64 (Bitwise.shiftRightZfBy n higher) newLower
+
+
+rotateRightBy : Int -> Int64 -> Int64
+rotateRightBy n i =
+    or (shiftLeftBy (64 - n) i) (shiftRightZfBy n i)
+
+
+toUnsigned : Int64 -> Int64
+toUnsigned (Int64 a b) =
+    Int64 (Bitwise.shiftRightZfBy 0 a) (Bitwise.shiftRightZfBy 0 b)
+
+
+
+-- Bytes
+
+
+decode : Decoder Int64
+decode =
+    Decode.map2 Int64
+        (Decode.unsignedInt32 BE)
+        (Decode.unsignedInt32 BE)
+
+
+toEncoder : Int64 -> Encoder
+toEncoder (Int64 higher lower) =
+    Encode.sequence
+        [ Encode.unsignedInt32 BE higher
+        , Encode.unsignedInt32 BE lower
+        ]
+
+
+toHex : Int64 -> String
+toHex (Int64 higher lower) =
+    let
+        high =
+            higher
+                |> Bitwise.shiftRightZfBy 0
+                |> Hex.toString
+                |> String.padLeft 8 '0'
+
+        low =
+            lower
+                |> Bitwise.shiftRightZfBy 0
+                |> Hex.toString
+                |> String.padLeft 8 '0'
+    in
+    high ++ low
+
+
+toByteValues : Int64 -> List Int
+toByteValues (Int64 higher lower) =
+    wordToBytes higher ++ wordToBytes lower
+
+
+wordToBytes : Int -> List Int
+wordToBytes int =
+    [ int |> Bitwise.shiftRightZfBy 0x18 |> Bitwise.and 0xFF
+    , int |> Bitwise.shiftRightZfBy 0x10 |> Bitwise.and 0xFF
+    , int |> Bitwise.shiftRightZfBy 0x08 |> Bitwise.and 0xFF
+    , int |> Bitwise.and 0xFF
+    ]
