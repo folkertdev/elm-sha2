@@ -8,6 +8,7 @@ import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Hex.Convert
 import Int64 exposing (Int64(..))
+import Internal.SHA512 as Internal
 import SHA512
 import Test exposing (..)
 
@@ -18,12 +19,6 @@ maxInt64 =
 
 y =
     Int64 0x01 0xFFFFFFFF
-
-
-bigSigma1 x =
-    Int64.rotateRightBy 14 x
-        |> Int64.xor (Int64.rotateRightBy 18 x)
-        |> Int64.xor (Int64.rotateRightBy 41 x)
 
 
 paddedBlock1 =
@@ -130,6 +125,15 @@ paddedBlock2 =
     ]
 
 
+oneMillion =
+    test "1 000 000 as" <|
+        \_ ->
+            String.repeat 1000000 "a"
+                |> SHA512.fromString
+                |> SHA512.toHex
+                |> Expect.equal "e718483d0ce769644e2e42c7bc15b4638e1f98b13b2044285632a803afa973ebde0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b"
+
+
 spec =
     describe "tests from the spec"
         [ describe "spec example 1"
@@ -146,7 +150,7 @@ spec =
                             "abc"
                     in
                     Encode.encode (Encode.string msg)
-                        |> padBuffer
+                        |> Internal.padBuffer (String.length msg)
                         |> Hex.Convert.toString
                         |> Hex.Convert.blocks 8
                         |> List.map String.toLower
@@ -166,14 +170,14 @@ spec =
                             "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
                     in
                     Encode.encode (Encode.string msg)
-                        |> padBuffer
+                        |> Internal.padBuffer (String.length msg)
                         |> Hex.Convert.toString
                         |> Hex.Convert.blocks 8
                         |> List.map String.toLower
                         |> Expect.equal paddedBlock2
             , test "big sigma 2" <|
                 \_ ->
-                    bigSigma1 (Int64 0xE4D35B61 0x3A5AC420)
+                    Internal.bigSigma1 (Int64 0xE4D35B61 0x3A5AC420)
                         |> Int64.toHex
                         |> Expect.equal (Int64 0x1116871B 0xAB2ECE50 |> Int64.toHex)
             , test "ch" <|
@@ -216,7 +220,7 @@ spec =
 
                         t1 =
                             h
-                                |> Int64.add (bigSigma1 e)
+                                |> Int64.add (Internal.bigSigma1 e)
                                 |> Int64.add ch
                                 |> Int64.add k
                                 |> Int64.add w
@@ -245,7 +249,7 @@ suite =
     describe "Int64"
         [ test "big sigma" <|
             \_ ->
-                bigSigma1 (Int64 0x510E527F 0xADE682D1)
+                Internal.bigSigma1 (Int64 0x510E527F 0xADE682D1)
                     |> Int64.toHex
                     |> Expect.equal (Int64 0x9427E33B 0xB5C9DBCA |> Int64.toHex)
         , describe "rotateRightBy 14 tests"
@@ -314,33 +318,3 @@ suite =
                         |> Expect.equal (Int64 0x3FD6F341 0x68800000 |> Int64.toHex)
             ]
         ]
-
-
-padBuffer : Bytes -> Bytes
-padBuffer bytes =
-    let
-        byteCount =
-            Bytes.width bytes
-
-        mdi =
-            -- Bitwise.and byteCount 0x7F
-            modBy 128 byteCount
-
-        try =
-            if mdi < 112 then
-                (111 - mdi) + 4
-
-            else
-                (239 - mdi) + 4
-
-        message =
-            Encode.encode
-                (Encode.sequence
-                    [ Encode.bytes bytes
-                    , Encode.unsignedInt8 0x80
-                    , Encode.sequence (List.repeat (try + 8) (Encode.unsignedInt8 0))
-                    , Encode.unsignedInt32 BE (Bitwise.shiftLeftBy 3 byteCount)
-                    ]
-                )
-    in
-    message
