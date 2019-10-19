@@ -82,9 +82,12 @@ fromBytes =
     hashBytes
 
 
-padBuffer : Int -> Bytes -> Bytes
-padBuffer byteCount bytes =
+padBuffer : Bytes -> Bytes
+padBuffer bytes =
     let
+        byteCount =
+            Bytes.width bytes
+
         finalBlockSize =
             -- modBy 64 byteCount, but faster
             Bitwise.and byteCount 0x3F
@@ -113,8 +116,20 @@ padBuffer byteCount bytes =
 
 hashBytes : State -> Bytes -> Digest
 hashBytes state bytes =
-    case hashBytesHelp (Bytes.width bytes) True bytes state of
-        State (Tuple8 a b c d e f g h) ->
+    let
+        message =
+            padBuffer bytes
+
+        numberOfChunks : Int
+        numberOfChunks =
+            Bytes.width message // 64
+
+        hashState : Decoder State
+        hashState =
+            iterate numberOfChunks reduceBytesMessage state
+    in
+    case Decode.decode hashState message of
+        Just (State (Tuple8 a b c d e f g h)) ->
             Digest
                 (Tuple8
                     (Bitwise.shiftRightZfBy 0 a)
@@ -127,51 +142,10 @@ hashBytes state bytes =
                     (Bitwise.shiftRightZfBy 0 h)
                 )
 
-
-{-| For some reason, working with large buffers is problematic
-
-Therefore we split them into smaller chunks if the message is very large
-
--}
-maxSize : Int
-maxSize =
-    2048 * 64
-
-
-hashBytesHelp : Int -> Bool -> Bytes -> State -> State
-hashBytesHelp fullSize isLast bytes state =
-    if Bytes.width bytes > maxSize then
-        let
-            ( first, rest ) =
-                splitBytes maxSize bytes
-        in
-        hashBytesHelp fullSize True rest (hashBytesHelp fullSize False first state)
-
-    else if isLast then
-        -- add padding bytes and length
-        hashChunks (padBuffer fullSize bytes) state
-
-    else
-        hashChunks bytes state
-
-
-hashChunks : Bytes -> State -> State
-hashChunks message state =
-    let
-        numberOfChunks : Int
-        numberOfChunks =
-            Bytes.width message // 64
-
-        hashState : Decoder State
-        hashState =
-            iterate numberOfChunks reduceBytesMessage state
-    in
-    case Decode.decode hashState message of
-        Just newState ->
-            newState
-
         Nothing ->
-            state
+            case state of
+                State tuple8 ->
+                    Digest tuple8
 
 
 u32 : Decoder Int
@@ -353,20 +327,6 @@ loopHelp step ( n, state ) =
 
     else
         Decode.succeed (Decode.Done state)
-
-
-splitBytes : Int -> Bytes -> ( Bytes, Bytes )
-splitBytes n buffer =
-    let
-        decoder =
-            Decode.map2 Tuple.pair (Decode.bytes n) (Decode.bytes (Bytes.width buffer - n))
-    in
-    case Decode.decode decoder buffer of
-        Just v ->
-            v
-
-        Nothing ->
-            ( buffer, Encode.encode (Encode.sequence []) )
 
 
 ks : Array.Array Int

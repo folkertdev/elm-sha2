@@ -79,9 +79,12 @@ fromBytes =
     hashBytes
 
 
-padBuffer : Int -> Bytes -> Bytes
-padBuffer byteCount bytes =
+padBuffer : Bytes -> Bytes
+padBuffer bytes =
     let
+        byteCount =
+            Bytes.width bytes
+
         finalBlockSize =
             -- modBy 128 byteCount, but faster
             Bitwise.and byteCount 0x7F
@@ -108,56 +111,12 @@ padBuffer byteCount bytes =
     message
 
 
-splitBytes : Int -> Bytes -> ( Bytes, Bytes )
-splitBytes n buffer =
-    let
-        decoder =
-            Decode.map2 Tuple.pair (Decode.bytes n) (Decode.bytes (Bytes.width buffer - n))
-    in
-    case Decode.decode decoder buffer of
-        Just v ->
-            v
-
-        Nothing ->
-            ( buffer, Encode.encode (Encode.sequence []) )
-
-
 hashBytes : State -> Bytes -> Digest
 hashBytes state bytes =
-    case hashBytesHelp (Bytes.width bytes) True bytes state of
-        State r ->
-            Digest r
-
-
-{-| For some reason, working with large buffers is problematic
-
-Therefore we split them into smaller chunks if the message is very large
-
--}
-maxSize : Int
-maxSize =
-    1024 * 128
-
-
-hashBytesHelp : Int -> Bool -> Bytes -> State -> State
-hashBytesHelp fullSize isLast bytes state =
-    if Bytes.width bytes > maxSize then
-        let
-            ( first, rest ) =
-                splitBytes maxSize bytes
-        in
-        hashBytesHelp fullSize True rest (hashBytesHelp fullSize False first state)
-
-    else if isLast then
-        hashChunks (padBuffer fullSize bytes) state
-
-    else
-        hashChunks bytes state
-
-
-hashChunks : Bytes -> State -> State
-hashChunks message state =
     let
+        message =
+            padBuffer bytes
+
         numberOfChunks =
             Bytes.width message // 128
 
@@ -166,11 +125,13 @@ hashChunks message state =
             iterate numberOfChunks reduceBytesMessage state
     in
     case Decode.decode hashState message of
-        Just newState ->
-            newState
+        Just (State r) ->
+            Digest r
 
         Nothing ->
-            state
+            case state of
+                State r ->
+                    Digest r
 
 
 u64 : Decoder Int64

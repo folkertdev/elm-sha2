@@ -94,7 +94,7 @@ spec =
                             "abc"
                     in
                     Encode.encode (Encode.string msg)
-                        |> Internal.padBuffer (String.length msg)
+                        |> Internal.padBuffer
                         |> Hex.Convert.toString
                         |> Hex.Convert.blocks 8
                         |> List.map String.toLower
@@ -114,7 +114,7 @@ spec =
                             "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
                     in
                     Encode.encode (Encode.string msg)
-                        |> Internal.padBuffer (String.length msg)
+                        |> Internal.padBuffer
                         |> Hex.Convert.toString
                         |> Hex.Convert.blocks 8
                         |> List.map String.toLower
