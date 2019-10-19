@@ -13,6 +13,12 @@ import SHA512
 import Test exposing (..)
 
 
+bigSigma1 e =
+    Int64.rotateRightBy 14 e
+        |> Int64.xor (Int64.rotateRightBy 18 e)
+        |> Int64.xor (Int64.rotateRightBy 41 e)
+
+
 maxInt64 =
     Int64 0xFFFFFFFF 0xFFFFFFFF
 
@@ -177,7 +183,7 @@ spec =
                         |> Expect.equal paddedBlock2
             , test "big sigma 2" <|
                 \_ ->
-                    Internal.bigSigma1 (Int64 0xE4D35B61 0x3A5AC420)
+                    bigSigma1 (Int64 0xE4D35B61 0x3A5AC420)
                         |> Int64.toHex
                         |> Expect.equal (Int64 0x1116871B 0xAB2ECE50 |> Int64.toHex)
             , test "ch" <|
@@ -220,7 +226,7 @@ spec =
 
                         t1 =
                             h
-                                |> Int64.add (Internal.bigSigma1 e)
+                                |> Int64.add (bigSigma1 e)
                                 |> Int64.add ch
                                 |> Int64.add k
                                 |> Int64.add w
@@ -249,7 +255,7 @@ suite =
     describe "Int64"
         [ test "big sigma" <|
             \_ ->
-                Internal.bigSigma1 (Int64 0x510E527F 0xADE682D1)
+                bigSigma1 (Int64 0x510E527F 0xADE682D1)
                     |> Int64.toHex
                     |> Expect.equal (Int64 0x9427E33B 0xB5C9DBCA |> Int64.toHex)
         , describe "rotateRightBy 14 tests"

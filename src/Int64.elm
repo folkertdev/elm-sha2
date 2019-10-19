@@ -104,8 +104,56 @@ shiftRightZfBy n (Int64 higher lower) =
 
 
 rotateRightBy : Int -> Int64 -> Int64
-rotateRightBy n i =
-    or (shiftLeftBy (64 - n) i) (shiftRightZfBy n i)
+rotateRightBy n ((Int64 higher lower) as i) =
+    if n > 32 then
+        let
+            -- guaranteed m <= 32
+            m =
+                64 - n
+
+            carry =
+                Bitwise.shiftRightZfBy (32 - m) lower
+
+            p1 =
+                higher
+                    |> Bitwise.shiftLeftBy m
+                    |> Bitwise.or carry
+
+            p2 =
+                Bitwise.shiftLeftBy m lower
+
+            q1 =
+                0
+
+            q2 =
+                Bitwise.shiftRightZfBy n higher
+        in
+        Int64 (Bitwise.or p1 q1) (Bitwise.or p2 q2)
+
+    else
+        let
+            -- guaranteed n <= 32, m > 32
+            m =
+                64 - n
+
+            p1 =
+                Bitwise.shiftLeftBy m lower
+
+            p2 =
+                0
+
+            carry =
+                Bitwise.shiftLeftBy (32 - n) higher
+
+            q1 =
+                Bitwise.shiftRightZfBy n higher
+
+            q2 =
+                lower
+                    |> Bitwise.shiftRightZfBy n
+                    |> Bitwise.or carry
+        in
+        Int64 (Bitwise.or p1 q1) (Bitwise.or p2 q2)
 
 
 toUnsigned : Int64 -> Int64

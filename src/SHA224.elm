@@ -1,34 +1,16 @@
 module SHA224 exposing
     ( Digest
     , fromString
+    , fromBytes
+    , fromByteValues
     , toHex, toBase64
-    , fromBytes, toBytes
-    , fromByteValues, toByteValues
+    , toBytes, toByteValues
     )
 
-{-| [SHA-1] is a [cryptographic hash function].
-Although it is no longer considered cryptographically secure (as collisions can
-be found faster than brute force), it is still very suitable for a broad range
-of uses, and is a lot stronger than MD5.
+{-| [SHA-224] is a [cryptographic hash function] that gives 112 bits of security.
 
-[SHA-1]: https://en.wikipedia.org/wiki/SHA-1
+[SHA-224]: https://tools.ietf.org/rfc/rfc3874.txt
 [cryptographic hash function]: https://en.wikipedia.org/wiki/Cryptographic_hash_function
-
-This package provides a way of creating SHA-1 digests from `String`s and `List
-Int`s (where each `Int` is between 0 and 255, and represents a byte). It can
-also take those `Digest`s and format them in [hexadecimal] or [base64] notation.
-Alternatively, you can get the binary digest, using a `List  Int` to represent
-the bytes.
-
-[hexadecimal]: https://en.wikipedia.org/wiki/Hexadecimal
-[base64]: https://en.wikipedia.org/wiki/Base64
-
-**Note:** Currently, the package can only create digests for around 200kb of
-data. If there is any interest in using this package for hashing >200kb, or for
-hashing [elm/bytes], [let me know][issues]!
-
-[elm/bytes]: https://github.com/elm/bytes
-[issues]: https://github.com/TSFoster/elm-sha1/issues
 
 @docs Digest
 
@@ -36,6 +18,8 @@ hashing [elm/bytes], [let me know][issues]!
 # Creating digests
 
 @docs fromString
+@docs fromBytes
+@docs fromByteValues
 
 
 # Formatting digests
@@ -43,10 +27,9 @@ hashing [elm/bytes], [let me know][issues]!
 @docs toHex, toBase64
 
 
-# Binary data
+# To binary data
 
-@docs fromBytes, toBytes
-@docs fromByteValues, toByteValues
+@docs toBytes, toByteValues
 
 -}
 
@@ -70,14 +53,14 @@ type Tuple7
     = Tuple7 Int Int Int Int Int Int Int
 
 
-{-| A type to represent a message digest. `SHA1.Digest`s are equatable, and you may
-want to consider keeping any digests you need in your `Model` as `Digest`s, not
-as `String`s created by [`toHex`](#toHex) or [`toBase64`](#toBase64).
+{-| Abstract representation of a sha224 digest.
 -}
 type Digest
     = Digest Tuple7
 
 
+{-| drop the final u32 from a sha256 digest
+-}
 convertDigest : Internal.Digest -> Digest
 convertDigest (Internal.Digest (Tuple8 a b c d e f g _)) =
     Digest (Tuple7 a b c d e f g)
@@ -89,8 +72,10 @@ convertDigest (Internal.Digest (Tuple8 a b c d e f g _)) =
 
 {-| Create a digest from a `String`.
 
-    "hello world" |> SHA1.fromString |> SHA1.toHex
-    --> "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"
+    "hello world"
+        |> SHA224.fromString
+        |> SHA224.toHex
+    --> "12f05477fc24bb4faefd865171156dafde1cec45b8ad3cf2522a563582b"
 
 -}
 fromString : String -> Digest
@@ -98,15 +83,17 @@ fromString =
     convertDigest << Internal.fromString initialState
 
 
-{-| Sometimes you have binary data that's not representable in a string. Create
-a digest from the raw "bytes", i.e. a `List` of `Int`s. Any items not between 0
-and 255 are discarded.
+{-| Create a digest from integer byte values.
+Values are considered mod 256, which means that larger than 255 overflow.
 
-    SHA1.fromByteValues [72, 105, 33, 32, 240, 159, 152, 132]
-    --> SHA1.fromString "Hi! 😄"
+    SHA224.fromByteValues
+        [72, 105, 33, 32, 240, 159, 152, 132 ]
+    --> SHA224.fromString "Hi! 😄"
 
-    [0x00, 0xFF, 0x34, 0xA5] |> SHA1.fromByteValues |> SHA1.toBase64
-    --> "sVQuFckyE6K3fsdLmLHmq8+J738="
+    [0x00, 0xFF, 0x34, 0xA5]
+        |> SHA224.fromByteValues
+        |> SHA224.toBase64
+    --> "XNMoqDRg7RdO+hXuACw+BWAVTd8aTNqXyjz35w=="
 
 -}
 fromByteValues : List Int -> Digest
@@ -122,9 +109,9 @@ fromByteValues =
     buffer : Bytes
     buffer = Encode.encode (Encode.unsignedInt32 BE 42)
 
-    SHA1.fromBytes buffer
-        |> SHA1.toHex
-        --> "25f0c736f1fad0770bbb9a265ded159517c1e68c"
+    SHA224.fromBytes buffer
+        |> SHA224.toHex
+        --> "1793ce43981dc8ea9c80d55181905c629b154dec6c914152e7dbb08a4177"
 
 -}
 fromBytes : Bytes -> Digest
@@ -142,18 +129,18 @@ initialState =
 -- FORMATTING
 
 
-{-| If you need the raw digest instead of the textual representation (for
-example, if using SHA-1 as part of another algorithm), `toBytes` is what you're
-looking for!
+{-| Get the individual byte values as integers.
 
     "And the band begins to play"
-        |> SHA1.fromString
-        |> SHA1.toByteValues
-    --> [ 0xF3, 0x08, 0x73, 0x13
-    --> , 0xD6, 0xBC, 0xE5, 0x5B
-    --> , 0x60, 0x0C, 0x69, 0x2F
-    --> , 0xE0, 0x92, 0xF4, 0x53
-    --> , 0x87, 0x3F, 0xAE, 0x91
+        |> SHA224.fromString
+        |> SHA224.toByteValues
+    --> [ 0xac, 0x41, 0xa7, 0x63
+    --> , 0x89, 0xc4, 0xe1, 0x5a
+    --> , 0x7e, 0x3b, 0x9d, 0x4a
+    --> , 0x24, 0x20, 0xef, 0xd0
+    --> , 0x32, 0x78, 0xd8, 0xfc
+    --> , 0xcb, 0x23, 0x39, 0xa1
+    --> , 0xe6, 0xaf, 0xcd, 0x18
     --> ]
 
 -}
@@ -184,23 +171,19 @@ toEncoder (Digest (Tuple7 a b c d e f g)) =
         ]
 
 
-{-| Turn a digest into `Bytes`.
-
-The digest is stored as 5 big-endian 32-bit unsigned integers, so the width is 20 bytes or 160 bits.
-
+{-| Turn a digest into `Bytes`. The digest is stored as 7 big-endian 32-bit unsigned integers, so the width is 28 bytes or 224 bits.
 -}
 toBytes : Digest -> Bytes
 toBytes =
     Encode.encode << toEncoder
 
 
-{-| One of the two canonical ways of representing a SHA-1 digest is with 40
-hexadecimal digits.
+{-| Represent the digest as a string of hexadecimal digits.
 
     "And our friends are all aboard"
-        |> SHA1.fromString
-        |> SHA1.toHex
-    --> "f9a0c23ddcd40f6956b0cf59cd9b8800d71de73d"
+        |> SHA224.fromString
+        |> SHA224.toHex
+    --> "143baf0c15656c9c0ecce1e4c1cb8491e61e5fe01c510e33d733138e899cb"
 
 -}
 toHex : Digest -> String
@@ -227,13 +210,12 @@ format x =
 -- appended.
 
 
-{-| One of the two canonical ways of representing a SHA-1 digest is in a 20
-digit long Base64 binary to ASCII text encoding.
+{-| Represent the digest as its base-64 encoding.
 
     "Many more of them live next door"
-        |> SHA1.fromString
-        |> SHA1.toBase64
-    --> "jfL0oVb5xakab6BMLplGe2XPbj8="
+        |> SHA224.fromString
+        |> SHA224.toBase64
+    --> "jGqILHEjFHl4RGN0oaRtFhktytsyncZyOHob4g=="
 
 -}
 toBase64 : Digest -> String

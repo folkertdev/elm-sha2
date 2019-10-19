@@ -1,11 +1,14 @@
 {
     "type": "package",
-    "name": "TSFoster/elm-sha1",
-    "summary": "Generate SHA1 digests of strings or arbitrary data",
+    "name": "folkertdev/elm-sha2",
+    "summary": "Fast elm/bytes based sha-2",
     "license": "BSD-3-Clause",
     "version": "1.0.4",
     "exposed-modules": [
-        "SHA1"
+        "SHA224",
+        "SHA256",
+        "SHA384",
+        "SHA512"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
