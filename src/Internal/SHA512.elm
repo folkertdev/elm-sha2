@@ -1,49 +1,5 @@
 module Internal.SHA512 exposing (..)
 
-{-| [SHA-1] is a [cryptographic hash function].
-Although it is no longer considered cryptographically secure (as collisions can
-be found faster than brute force), it is still very suitable for a broad range
-of uses, and is a lot stronger than MD5.
-
-[SHA-1]: https://en.wikipedia.org/wiki/SHA-1
-[cryptographic hash function]: https://en.wikipedia.org/wiki/Cryptographic_hash_function
-
-This package provides a way of creating SHA-1 digests from `String`s and `List
-Int`s (where each `Int` is between 0 and 255, and represents a byte). It can
-also take those `Digest`s and format them in [hexadecimal] or [base64] notation.
-Alternatively, you can get the binary digest, using a `List  Int` to represent
-the bytes.
-
-[hexadecimal]: https://en.wikipedia.org/wiki/Hexadecimal
-[base64]: https://en.wikipedia.org/wiki/Base64
-
-**Note:** Currently, the package can only create digests for around 200kb of
-data. If there is any interest in using this package for hashing >200kb, or for
-hashing [elm/bytes], [let me know][issues]!
-
-[elm/bytes]: https://github.com/elm/bytes
-[issues]: https://github.com/TSFoster/elm-sha1/issues
-
-@docs Digest
-
-
-# Creating digests
-
-@docs fromString
-
-
-# Formatting digests
-
-@docs toHex, toBase64
-
-
-# Binary data
-
-@docs fromBytes, toBytes
-@docs fromByteValues, toByteValues
-
--}
-
 import Array exposing (Array)
 import Base64
 import Bitwise exposing (and, complement, or, shiftLeftBy, shiftRightZfBy)
@@ -51,7 +7,6 @@ import Bytes exposing (Bytes, Endianness(..))
 import Bytes.Decode as Decode exposing (Decoder, Step(..))
 import Bytes.Encode as Encode
 import Hex
-import Hex.Convert
 import Int64 exposing (Int64(..))
 
 
@@ -89,10 +44,6 @@ blockToString b16 b15 b14 b13 b12 b11 b10 b9 b8 b7 b6 b5 b4 b3 b2 b1 =
         |> String.join " "
 
 
-{-| A type to represent a message digest. `SHA1.Digest`s are equatable, and you may
-want to consider keeping any digests you need in your `Model` as `Digest`s, not
-as `String`s created by [`toHex`](#toHex) or [`toBase64`](#toBase64).
--}
 type Digest
     = Digest Tuple8
 
@@ -109,28 +60,11 @@ type DeltaState
 -- CALCULATING
 
 
-{-| Create a digest from a `String`.
-
-    "hello world" |> SHA1.fromString |> SHA1.toHex
-    --> "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"
-
--}
 fromString : State -> String -> Digest
 fromString state =
     hashBytes state << Encode.encode << Encode.string
 
 
-{-| Sometimes you have binary data that's not representable in a string. Create
-a digest from the raw "bytes", i.e. a `List` of `Int`s. Any items not between 0
-and 255 are discarded.
-
-    SHA1.fromByteValues [72, 105, 33, 32, 240, 159, 152, 132]
-    --> SHA1.fromString "Hi! 😄"
-
-    [0x00, 0xFF, 0x34, 0xA5] |> SHA1.fromByteValues |> SHA1.toBase64
-    --> "sVQuFckyE6K3fsdLmLHmq8+J738="
-
--}
 fromByteValues : State -> List Int -> Digest
 fromByteValues state input =
     input
@@ -140,19 +74,6 @@ fromByteValues state input =
         |> hashBytes state
 
 
-{-| Create a digest from a [`Bytes`](https://package.elm-lang.org/packages/elm/bytes/latest/)
-
-    import Bytes.Encode as Encode
-    import Bytes exposing (Bytes, Endianness(..))
-
-    buffer : Bytes
-    buffer = Encode.encode (Encode.unsignedInt32 BE 42)
-
-    SHA1.fromBytes buffer
-        |> SHA1.toHex
-        --> "25f0c736f1fad0770bbb9a265ded159517c1e68c"
-
--}
 fromBytes : State -> Bytes -> Digest
 fromBytes =
     hashBytes
@@ -240,14 +161,9 @@ hashChunks message state =
         numberOfChunks =
             Bytes.width message // 128
 
-        -- The `Decode.succeed ()` is required! it fixes a weird issue with large buffers
-        -- allocating many large buffers can make SHA1 non-deterministic somehow
-        -- (I'm not sure why that is right now, and if it's an elm problem or something deeper)
-        -- in any case, the `Decode.andThen` fixes the issue
         hashState : Decoder State
         hashState =
-            Decode.succeed ()
-                |> Decode.andThen (\_ -> iterate numberOfChunks reduceBytesMessage state)
+            iterate numberOfChunks reduceBytesMessage state
     in
     case Decode.decode hashState message of
         Just newState ->
@@ -316,14 +232,34 @@ reduceWordsHelp i deltaState b16 b15 b14 b13 b12 b11 b10 b9 b8 b7 b6 b5 b4 b3 b2
     if i < 64 then
         let
             smallSigma0 =
-                Int64.rotateRightBy 1 b15
-                    |> Int64.xor (Int64.rotateRightBy 8 b15)
-                    |> Int64.xor (Int64.shiftRightZfBy 7 b15)
+                let
+                    (Int64 x1 x2) =
+                        Int64.rotateRightBy 1 b15
+
+                    (Int64 x3 x4) =
+                        Int64.rotateRightBy 8 b15
+
+                    (Int64 x5 x6) =
+                        Int64.shiftRightZfBy 7 b15
+                in
+                Int64
+                    (x1 |> Bitwise.xor x3 |> Bitwise.xor x5)
+                    (x2 |> Bitwise.xor x4 |> Bitwise.xor x6)
 
             smallSigma1 =
-                Int64.rotateRightBy 19 b2
-                    |> Int64.xor (Int64.rotateRightBy 61 b2)
-                    |> Int64.xor (Int64.shiftRightZfBy 6 b2)
+                let
+                    (Int64 x1 x2) =
+                        Int64.rotateRightBy 19 b2
+
+                    (Int64 x3 x4) =
+                        Int64.rotateRightBy 61 b2
+
+                    (Int64 x5 x6) =
+                        Int64.shiftRightZfBy 6 b2
+                in
+                Int64
+                    (x1 |> Bitwise.xor x3 |> Bitwise.xor x5)
+                    (x2 |> Bitwise.xor x4 |> Bitwise.xor x6)
 
             w : Int64
             w =
@@ -343,8 +279,7 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
                 |> Int64.xor (Int64.and (Int64.complement e) g)
 
         maj =
-            Int64.and a b
-                |> Int64.xor (Int64.and a c)
+            Int64.and a (Int64.xor b c)
                 |> Int64.xor (Int64.and b c)
 
         k =
@@ -356,9 +291,19 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
                     v
 
         bigSigma1 =
-            Int64.rotateRightBy 14 e
-                |> Int64.xor (Int64.rotateRightBy 18 e)
-                |> Int64.xor (Int64.rotateRightBy 41 e)
+            let
+                (Int64 x1 x2) =
+                    Int64.rotateRightBy 14 e
+
+                (Int64 x3 x4) =
+                    Int64.rotateRightBy 18 e
+
+                (Int64 x5 x6) =
+                    Int64.rotateRightBy 41 e
+            in
+            Int64
+                (x1 |> Bitwise.xor x3 |> Bitwise.xor x5)
+                (x2 |> Bitwise.xor x4 |> Bitwise.xor x6)
 
         t1 =
             h
@@ -368,9 +313,19 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
                 |> Int64.add w
 
         bigSigma0 =
-            Int64.rotateRightBy 28 a
-                |> Int64.xor (Int64.rotateRightBy 34 a)
-                |> Int64.xor (Int64.rotateRightBy 39 a)
+            let
+                (Int64 x1 x2) =
+                    Int64.rotateRightBy 28 a
+
+                (Int64 x3 x4) =
+                    Int64.rotateRightBy 34 a
+
+                (Int64 x5 x6) =
+                    Int64.rotateRightBy 39 a
+            in
+            Int64
+                (x1 |> Bitwise.xor x3 |> Bitwise.xor x5)
+                (x2 |> Bitwise.xor x4 |> Bitwise.xor x6)
 
         t2 =
             bigSigma0
@@ -380,120 +335,6 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
             Tuple8 (Int64.add t1 t2) a b c (Int64.add d t1) e f g
     in
     DeltaState result
-
-
-trim =
-    Int64.shiftRightZfBy 0
-
-
-initialState : State
-initialState =
-    State
-        (Tuple8
-            (Int64 0x6A09E667 0xF3BCC908)
-            (Int64 0xBB67AE85 0x84CAA73B)
-            (Int64 0x3C6EF372 0xFE94F82B)
-            (Int64 0xA54FF53A 0x5F1D36F1)
-            (Int64 0x510E527F 0xADE682D1)
-            (Int64 0x9B05688C 0x2B3E6C1F)
-            (Int64 0x1F83D9AB 0xFB41BD6B)
-            (Int64 0x5BE0CD19 0x137E2179)
-        )
-
-
-
--- FORMATTING
-
-
-{-| If you need the raw digest instead of the textual representation (for
-example, if using SHA-1 as part of another algorithm), `toBytes` is what you're
-looking for!
-
-    "And the band begins to play"
-        |> SHA1.fromString
-        |> SHA1.toByteValues
-    --> [ 0xF3, 0x08, 0x73, 0x13
-    --> , 0xD6, 0xBC, 0xE5, 0x5B
-    --> , 0x60, 0x0C, 0x69, 0x2F
-    --> , 0xE0, 0x92, 0xF4, 0x53
-    --> , 0x87, 0x3F, 0xAE, 0x91
-    --> ]
-
--}
-toByteValues : Digest -> List Int
-toByteValues (Digest (Tuple8 a b c d e f g h)) =
-    List.concatMap Int64.toByteValues [ a, b, c, d, e, f, g, h ]
-
-
-toEncoder : Digest -> Encode.Encoder
-toEncoder (Digest (Tuple8 a b c d e f g h)) =
-    Encode.sequence
-        [ Int64.toEncoder a
-        , Int64.toEncoder b
-        , Int64.toEncoder c
-        , Int64.toEncoder d
-        , Int64.toEncoder e
-        , Int64.toEncoder f
-        , Int64.toEncoder g
-        , Int64.toEncoder h
-        ]
-
-
-{-| Turn a digest into `Bytes`.
-
-The digest is stored as 5 big-endian 32-bit unsigned integers, so the width is 20 bytes or 160 bits.
-
--}
-toBytes : Digest -> Bytes
-toBytes =
-    Encode.encode << toEncoder
-
-
-{-| One of the two canonical ways of representing a SHA-1 digest is with 40
-hexadecimal digits.
-
-    "And our friends are all aboard"
-        |> SHA1.fromString
-        |> SHA1.toHex
-    --> "f9a0c23ddcd40f6956b0cf59cd9b8800d71de73d"
-
--}
-toHex : Digest -> String
-toHex (Digest (Tuple8 a b c d e f g h)) =
-    Int64.toHex a
-        ++ Int64.toHex b
-        ++ Int64.toHex c
-        ++ Int64.toHex d
-        ++ Int64.toHex e
-        ++ Int64.toHex f
-        ++ Int64.toHex g
-        ++ Int64.toHex h
-
-
-
--- Base64 uses 1 character per 6 bits, which doesn't divide very nicely into our
--- 5 32-bit  integers! The  base64 digest  is 28  characters long,  although the
--- final character  is a '=',  which means it's  padded. Therefore, it  uses 162
--- bits  of entropy  to display  our 160  bit  digest, so  the digest  has 2  0s
--- appended.
-
-
-{-| One of the two canonical ways of representing a SHA-1 digest is in a 20
-digit long Base64 binary to ASCII text encoding.
-
-    "Many more of them live next door"
-        |> SHA1.fromString
-        |> SHA1.toBase64
-    --> "jfL0oVb5xakab6BMLplGe2XPbj8="
-
--}
-toBase64 : Digest -> String
-toBase64 digest =
-    digest
-        |> toEncoder
-        |> Encode.encode
-        |> Base64.fromBytes
-        |> Maybe.withDefault ""
 
 
 
@@ -536,15 +377,16 @@ Needs some care to not run into stack overflow. This definition is nicely tail-r
 -}
 iterate : Int -> (a -> Decoder a) -> a -> Decoder a
 iterate n step initial =
-    iterateHelp n (\value -> Decode.andThen step value) (Decode.succeed initial)
+    Decode.loop ( n, initial ) (loopHelp step)
 
 
-iterateHelp n step initial =
+loopHelp step ( n, state ) =
     if n > 0 then
-        iterateHelp (n - 1) step (step initial)
+        step state
+            |> Decode.map (\new -> Loop ( n - 1, new ))
 
     else
-        initial
+        Decode.succeed (Decode.Done state)
 
 
 ks =

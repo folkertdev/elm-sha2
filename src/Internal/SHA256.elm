@@ -1,49 +1,5 @@
 module Internal.SHA256 exposing (..)
 
-{-| [SHA-1] is a [cryptographic hash function].
-Although it is no longer considered cryptographically secure (as collisions can
-be found faster than brute force), it is still very suitable for a broad range
-of uses, and is a lot stronger than MD5.
-
-[SHA-1]: https://en.wikipedia.org/wiki/SHA-1
-[cryptographic hash function]: https://en.wikipedia.org/wiki/Cryptographic_hash_function
-
-This package provides a way of creating SHA-1 digests from `String`s and `List
-Int`s (where each `Int` is between 0 and 255, and represents a byte). It can
-also take those `Digest`s and format them in [hexadecimal] or [base64] notation.
-Alternatively, you can get the binary digest, using a `List  Int` to represent
-the bytes.
-
-[hexadecimal]: https://en.wikipedia.org/wiki/Hexadecimal
-[base64]: https://en.wikipedia.org/wiki/Base64
-
-**Note:** Currently, the package can only create digests for around 200kb of
-data. If there is any interest in using this package for hashing >200kb, or for
-hashing [elm/bytes], [let me know][issues]!
-
-[elm/bytes]: https://github.com/elm/bytes
-[issues]: https://github.com/TSFoster/elm-sha1/issues
-
-@docs Digest
-
-
-# Creating digests
-
-@docs fromString
-
-
-# Formatting digests
-
-@docs toHex, toBase64
-
-
-# Binary data
-
-@docs fromBytes, toBytes
-@docs fromByteValues, toByteValues
-
--}
-
 import Array
 import Base64
 import Bitwise exposing (and, complement, or, shiftLeftBy, shiftRightZfBy)
@@ -51,7 +7,6 @@ import Bytes exposing (Bytes, Endianness(..))
 import Bytes.Decode as Decode exposing (Decoder, Step(..))
 import Bytes.Encode as Encode
 import Hex
-import Hex.Convert
 
 
 
@@ -108,28 +63,11 @@ type DeltaState
 -- CALCULATING
 
 
-{-| Create a digest from a `String`.
-
-    "hello world" |> SHA1.fromString |> SHA1.toHex
-    --> "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"
-
--}
 fromString : State -> String -> Digest
 fromString state =
     hashBytes state << Encode.encode << Encode.string
 
 
-{-| Sometimes you have binary data that's not representable in a string. Create
-a digest from the raw "bytes", i.e. a `List` of `Int`s. Any items not between 0
-and 255 are discarded.
-
-    SHA1.fromByteValues [72, 105, 33, 32, 240, 159, 152, 132]
-    --> SHA1.fromString "Hi! 😄"
-
-    [0x00, 0xFF, 0x34, 0xA5] |> SHA1.fromByteValues |> SHA1.toBase64
-    --> "sVQuFckyE6K3fsdLmLHmq8+J738="
-
--}
 fromByteValues : State -> List Int -> Digest
 fromByteValues state input =
     input
@@ -139,19 +77,6 @@ fromByteValues state input =
         |> hashBytes state
 
 
-{-| Create a digest from a [`Bytes`](https://package.elm-lang.org/packages/elm/bytes/latest/)
-
-    import Bytes.Encode as Encode
-    import Bytes exposing (Bytes, Endianness(..))
-
-    buffer : Bytes
-    buffer = Encode.encode (Encode.unsignedInt32 BE 42)
-
-    SHA1.fromBytes buffer
-        |> SHA1.toHex
-        --> "25f0c736f1fad0770bbb9a265ded159517c1e68c"
-
--}
 fromBytes : State -> Bytes -> Digest
 fromBytes =
     hashBytes
@@ -316,8 +241,7 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
                 |> Bitwise.shiftRightZfBy 0
 
         maj =
-            Bitwise.and a b
-                |> Bitwise.xor (Bitwise.and a c)
+            Bitwise.and a (Bitwise.xor b c)
                 |> Bitwise.xor (Bitwise.and b c)
 
         k =
@@ -332,6 +256,14 @@ calculateDigestDeltas index w (DeltaState (Tuple8 a b c d e f g h)) =
             Bitwise.or (Bitwise.shiftLeftBy (32 - 6) e) (Bitwise.shiftRightZfBy 6 e)
                 |> Bitwise.xor (Bitwise.or (Bitwise.shiftLeftBy (32 - 11) e) (Bitwise.shiftRightZfBy 11 e))
                 |> Bitwise.xor (Bitwise.or (Bitwise.shiftLeftBy (32 - 25) e) (Bitwise.shiftRightZfBy 25 e))
+
+        alt =
+            Bitwise.shiftLeftBy (32 - 6) e
+                |> Bitwise.xor (Bitwise.shiftRightZfBy 6 e)
+                |> Bitwise.xor (Bitwise.shiftLeftBy (32 - 11) e)
+                |> Bitwise.xor (Bitwise.shiftRightZfBy 11 e)
+                |> Bitwise.xor (Bitwise.shiftLeftBy (32 - 25) e)
+                |> Bitwise.xor (Bitwise.shiftRightZfBy 25 e)
 
         t1 =
             h + bigSigma1 + ch + k + w
@@ -401,15 +333,16 @@ Needs some care to not run into stack overflow. This definition is nicely tail-r
 -}
 iterate : Int -> (a -> Decoder a) -> a -> Decoder a
 iterate n step initial =
-    iterateHelp n (\value -> Decode.andThen step value) (Decode.succeed initial)
+    Decode.loop ( n, initial ) (loopHelp step)
 
 
-iterateHelp n step initial =
+loopHelp step ( n, state ) =
     if n > 0 then
-        iterateHelp (n - 1) step (step initial)
+        step state
+            |> Decode.map (\new -> Loop ( n - 1, new ))
 
     else
-        initial
+        Decode.succeed (Decode.Done state)
 
 
 splitBytes : Int -> Bytes -> ( Bytes, Bytes )

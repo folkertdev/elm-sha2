@@ -18,7 +18,9 @@ and (Int64 a b) (Int64 p q) =
 
 complement : Int64 -> Int64
 complement (Int64 a b) =
-    Int64 (Bitwise.complement a) (Bitwise.complement b)
+    Int64
+        (Bitwise.complement a |> Bitwise.shiftRightZfBy 0)
+        (Bitwise.complement b |> Bitwise.shiftRightZfBy 0)
 
 
 or : Int64 -> Int64 -> Int64
@@ -32,34 +34,20 @@ xor (Int64 a b) (Int64 p q) =
 
 
 add : Int64 -> Int64 -> Int64
-add (Int64 p1 p2) (Int64 p3 p4) =
+add (Int64 a b) (Int64 p q) =
     let
-        a =
-            Bitwise.shiftRightZfBy 0 p1
-
-        b =
-            Bitwise.shiftRightZfBy 0 p2
-
-        p =
-            Bitwise.shiftRightZfBy 0 p3
-
-        q =
-            Bitwise.shiftRightZfBy 0 p4
-
         lower =
-            b + q
-
-        carry1 =
-            if lower > 0xFFFFFFFF then
-                (lower - Bitwise.shiftRightZfBy 0 lower) - 0xFFFFFFFF
-
-            else
-                0
+            Bitwise.shiftRightZfBy 0 b + Bitwise.shiftRightZfBy 0 q
 
         higher =
-            carry1 + a + p
+            Bitwise.shiftRightZfBy 0 a + Bitwise.shiftRightZfBy 0 p
     in
-    Int64 (Bitwise.shiftRightBy 0 higher) (Bitwise.shiftRightBy 0 lower)
+    -- check for overflow in the lower bits
+    if lower > 0xFFFFFFFF then
+        Int64 (Bitwise.shiftRightZfBy 0 (higher + 1)) (Bitwise.shiftRightZfBy 0 lower)
+
+    else
+        Int64 (Bitwise.shiftRightZfBy 0 higher) (Bitwise.shiftRightZfBy 0 lower)
 
 
 shiftLeftBy : Int -> Int64 -> Int64

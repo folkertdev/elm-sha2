@@ -46,8 +46,8 @@ SHA512.toBase64 digest2
 
 On my machine, with a 3Mb file
 
-* sha256 takes ~500ms
-* sha512 takes ~1700ms
+* sha256 takes ~400ms
+* sha512 takes ~1500ms
 
 Why is this package faster than other current elm packages? Mainly because the usage of `elm/bytes`, which provides more compact storage and faster decoding than working with for instance a `List Int`.
 But there are some other tricks, like minimizing allocation and manual inlining of small functions. I plan to write a blog post about this. 

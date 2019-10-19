@@ -7,7 +7,7 @@ import File.Select as Select
 import Html exposing (Html, button, p, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-import SHA256 as SHA
+import SHA512 as SHA
 import Task
 
 

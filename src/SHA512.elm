@@ -40,7 +40,6 @@ import Bytes exposing (Bytes, Endianness(..))
 import Bytes.Decode as Decode exposing (Decoder, Step(..))
 import Bytes.Encode as Encode
 import Hex
-import Hex.Convert
 import Int64 exposing (Int64(..))
 import Internal.SHA512 as Internal exposing (Digest(..), Tuple8(..))
 
