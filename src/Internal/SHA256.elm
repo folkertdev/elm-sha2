@@ -114,8 +114,18 @@ padBuffer byteCount bytes =
 hashBytes : State -> Bytes -> Digest
 hashBytes state bytes =
     case hashBytesHelp (Bytes.width bytes) True bytes state of
-        State r ->
-            Digest r
+        State (Tuple8 a b c d e f g h) ->
+            Digest
+                (Tuple8
+                    (Bitwise.shiftRightZfBy 0 a)
+                    (Bitwise.shiftRightZfBy 0 b)
+                    (Bitwise.shiftRightZfBy 0 c)
+                    (Bitwise.shiftRightZfBy 0 d)
+                    (Bitwise.shiftRightZfBy 0 e)
+                    (Bitwise.shiftRightZfBy 0 f)
+                    (Bitwise.shiftRightZfBy 0 g)
+                    (Bitwise.shiftRightZfBy 0 h)
+                )
 
 
 {-| For some reason, working with large buffers is problematic

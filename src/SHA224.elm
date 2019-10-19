@@ -74,7 +74,7 @@ convertDigest (Internal.Digest (Tuple8 a b c d e f g _)) =
     "hello world"
         |> SHA224.fromString
         |> SHA224.toHex
-    --> "12f05477fc24bb4faefd865171156dafde1cec45b8ad3cf2522a563582b"
+    --> "2f05477fc24bb4faefd86517156dafdecec45b8ad3cf2522a563582b"
 
 -}
 fromString : String -> Digest
@@ -110,7 +110,7 @@ fromByteValues =
 
     SHA224.fromBytes buffer
         |> SHA224.toHex
-        --> "1793ce43981dc8ea9c80d55181905c629b154dec6c914152e7dbb08a4177"
+        --> "793ce43981dc8ea9c80d5518905c629b54dec6c94152e7dbb08a4177"
 
 -}
 fromBytes : Bytes -> Digest
@@ -182,7 +182,7 @@ toBytes =
     "And our friends are all aboard"
         |> SHA224.fromString
         |> SHA224.toHex
-    --> "143baf0c15656c9c0ecce1e4c1cb8491e61e5fe01c510e33d733138e899cb"
+    --> "43baf0c15656c9c0ecce1e4ccb8491e6e5fe01c50e33d73338e899cb"
 
 -}
 toHex : Digest -> String
