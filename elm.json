@@ -1,9 +1,9 @@
 {
     "type": "package",
     "name": "folkertdev/elm-sha2",
-    "summary": "Fast elm/bytes based sha-2",
+    "summary": "Fast elm/bytes based sha256 and sha512",
     "license": "BSD-3-Clause",
-    "version": "1.0.4",
+    "version": "1.0.0",
     "exposed-modules": [
         "SHA224",
         "SHA256",
@@ -15,7 +15,6 @@
         "danfishgold/base64-bytes": "1.0.2 <= v < 2.0.0",
         "elm/bytes": "1.0.8 <= v < 2.0.0",
         "elm/core": "1.0.2 <= v < 2.0.0",
-        "jxxcarlson/hex": "4.0.0 <= v < 5.0.0",
         "rtfeldman/elm-hex": "1.0.0 <= v < 2.0.0"
     },
     "test-dependencies": {
