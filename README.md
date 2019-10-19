@@ -40,7 +40,7 @@ SHA512.toBase64 digest2
 
 **Example Files**
 
-* [Hash a `File`](foo)
+* [Hash a `File`](https://github.com/folkertdev/elm-sha2/blob/master/benchmark/FileUpload.elm)
 
 ## Performance notes
 
