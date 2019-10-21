@@ -1,4 +1,4 @@
-module Internal.SHA256 exposing (..)
+module Internal.SHA256 exposing (DeltaState(..), Digest(..), State(..), Tuple8(..), blockSize, blockToString, calculateDigestDeltas, fromByteValues, fromBytes, fromString, hashBytes, iterate, ks, loopHelp, map16, numberOfWords, padBuffer, reduceBytesMessage, reduceMessage, reduceWordsHelp, rotateRightBy, toString, u32)
 
 import Array
 import Base64
@@ -70,8 +70,29 @@ fromString state =
 
 fromByteValues : State -> List Int -> Digest
 fromByteValues state input =
+    let
+        -- try to use unsignedInt32 to represent 4 bytes
+        -- much more efficient for large inputs
+        pack b1 b2 b3 b4 =
+            Encode.unsignedInt32 BE
+                (Bitwise.or
+                    (Bitwise.or (Bitwise.shiftLeftBy 24 b1) (Bitwise.shiftLeftBy 16 b2))
+                    (Bitwise.or (Bitwise.shiftLeftBy 8 b3) b4)
+                )
+
+        go accum remaining =
+            case remaining of
+                b1 :: b2 :: b3 :: b4 :: rest ->
+                    go (pack b1 b2 b3 b4 :: accum) rest
+
+                b1 :: rest ->
+                    go (Encode.unsignedInt8 b1 :: accum) rest
+
+                [] ->
+                    List.reverse accum
+    in
     input
-        |> List.map Encode.unsignedInt8
+        |> go []
         |> Encode.sequence
         |> Encode.encode
         |> hashBytes state
